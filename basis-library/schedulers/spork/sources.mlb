@@ -21,7 +21,6 @@ local
   end
 
   ../shh/CumulativePerProcTimer.sml
-  SPORK_JOIN.sig
   ../shh/SimpleRandom.sml
   ../shh/queue/DequeABP.sml
   (*Stack.sml*)
@@ -35,8 +34,15 @@ local
   end
 
   Scheduler.sml
+
+  SPORK_JOIN.sig
   MkSporkJoin.sml
   SporkJoin.sml
+
+  ../shh/FORK_JOIN.sig
+  ../par-pcall/MkForkJoin.sml
+  ForkJoin.sml
 in
   structure SporkJoin
+  structure ForkJoin
 end
