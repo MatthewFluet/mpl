@@ -1405,17 +1405,18 @@ fun 'a checkApp (prim: 'a t,
        | MLton_size => oneTarg (fn t => (oneArg t, csize))
        | MLton_touch => oneTarg (fn t => (oneArg t, unit))
        | Spork =>
-            (* spork : (unit -> 'a) * (unit -> 'b) * ('a -> 'c) * ('a -> 'c) -> 'c; *)
-            threeTargs (fn (ta, tb, tc) =>
-                           let val cont = arrow (unit, ta)
-                               val spwn = arrow (unit, tb)
-                               (* val spwn = arrow (td, tb) *)
-                               val seq = arrow (ta, tc)
-                               val sync = arrow (ta, tc)
-                               (* val sync = arrow (tuple (Vector.new2 (ta, td)), tc) *)
-                           in
-                             (fourArgs (cont, spwn, seq, sync), tc)
-                           end)
+            (* spork : ('aa -> 'ar) * 'a * ('ba -> 'br) * 'ba * ('ar -> 'c) * ('ar -> 'c) -> 'c; *)
+            fiveTargs (fn (taa, tar, tba, tbr, tc) =>
+                       let
+                          val cont = arrow (taa, tar)
+                          val spwn = arrow (tba, tbr)
+                          (* val spwn = arrow (tuple (Vector.new2 (tba, td)), tbr) *)
+                          val seq = arrow (tar, tc)
+                          val sync = arrow (tar, tc)
+                          (* val sync = arrow (tuple (Vector.new2 (tar, td)), tc) *)
+                       in
+                          (sixArgs (cont, taa, spwn, tba, seq, sync), tc)
+                       end)
        | Spork_forkThreadAndSetData => oneTarg (fn t => (twoArgs (thread, t), thread))
        | Spork_getData => oneTarg (fn t => (noArgs, t))
        | Real_Math_acos s => realUnary s
@@ -1531,6 +1532,7 @@ fun ('a, 'b) extractTargs (prim: 'b t,
       (*val five = Vector.new5*)
       val three = Vector.new3
       val four = Vector.new4
+      val five = Vector.new5
       fun arg i = Vector.sub (args, i)
       datatype z = datatype t
    in
@@ -1561,10 +1563,14 @@ fun ('a, 'b) extractTargs (prim: 'b t,
        | MLton_size => one (arg 0)
        | MLton_touch => one (arg 0)
        | Spork =>
-            (* spork : (unit -> 'a) * (unit -> 'b) * ('a -> 'c) * ('a -> 'c) -> 'c; *)
-            three (#2 (deArrow (arg 0)),
-                   #2 (deArrow (arg 1)),
-                   #2 (deArrow (arg 2)))
+            (* spork : ('aa -> 'ar) * 'aa * ('ba -> 'br) * 'ba * ('ar -> 'c) * ('ar -> 'c) -> 'c; *)
+            let
+               val (taa, tar) = deArrow (arg 0)
+               val (tba, tbr) = deArrow (arg 2)
+               val (_, tc) = deArrow (arg 4)
+            in
+               five (taa, tar, tba, tbr, tc)
+            end
        | Spork_forkThreadAndSetData => one (arg 1)
        | Spork_getData => one result
        | Ref_assign _ => one (deRef (arg 0))

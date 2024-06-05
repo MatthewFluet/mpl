@@ -104,11 +104,15 @@ struct
   
   val primSpork =
       _prim "spork"
-        : (unit -> 'a)	(* cont *)
-        * (unit -> 'b)	(* spwn *)
-        * ('a -> 'c)	(* seq  *)
-        * ('a -> 'c)	(* sync *)
+        : ('aa -> 'ar)	(* cont *)
+        * 'aa
+        * ('ba -> 'br)	(* spwn *)
+        * 'ba
+        * ('ar -> 'c)	(* seq  *)
+        * ('ar -> 'c)	(* sync *)
         -> 'c;
+  val primSpork = fn (cont, spwn, seq, sync) =>
+     primSpork (cont, (), spwn, (), seq, sync)
 
   (*val primFork =
       _prim "_fork"
@@ -1081,12 +1085,12 @@ struct
         fun seq' contr =
             seq (Result.extractResult contr)
 
-        fun sync' (contr, jp) =
+        fun sync' contr =
           let
             val _ = dbgmsg'' (fn _ => "hello from sync continuation")
             val _ = Thread.atomicBegin ()
             val _ = assertAtomic "sync continuation" 1
-            (*val jp = primGetData ()*)
+            val jp = primGetData ()
             val spwnr = syncEndAtomic maybeParClearSuspectsAtDepth jp (inject o spwn)
             val contr' = Result.extractResult contr
             val spwnr' = case project (Result.extractResult spwnr) of
@@ -1102,7 +1106,7 @@ struct
     fun greedyWorkAmortizedSpork (cont: unit -> 'a, spwn: unit -> 'b,
                                   seq: 'a -> 'c, sync: 'a * 'b -> 'c) : 'c =
       if currentSpareHeartbeats () < spawnCost then
-        spork' (cont, spwn, seq, sync)
+        spork (cont, spwn, seq, sync)
       else
         case maybeSpawnFunc {allowCGC = true} spwn of
           NONE => seq (cont ())
