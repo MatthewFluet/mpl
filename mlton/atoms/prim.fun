@@ -114,7 +114,7 @@ datatype 'a t =
  | MLton_touch (* to rssa (as nop) or backend (as nop) *)
  | Spork (* closure convert *)
  | Spork_forkThreadAndSetData (* to rssa (as runtime C fn) *)
- | Spork_getData (* backend *)
+ | Spork_getData of Spid.t (* backend *)
  | Real_Math_acos of RealSize.t (* codegen *)
  | Real_Math_asin of RealSize.t (* codegen *)
  | Real_Math_atan of RealSize.t (* codegen *)
@@ -294,7 +294,7 @@ fun toString (n: 'a t): string =
        | MLton_touch => "MLton_touch"
        | Spork => "spork"
        | Spork_forkThreadAndSetData => "spork_forkThreadAndSetData"
-       | Spork_getData => "spork_getData"
+       | Spork_getData spid => concat ["spork_getData<", Spid.toString spid, ">"]
        | Real_Math_acos s => real (s, "Math_acos")
        | Real_Math_asin s => real (s, "Math_asin")
        | Real_Math_atan s => real (s, "Math_atan")
@@ -457,7 +457,7 @@ val equals: 'a t * 'a t -> bool =
     | (MLton_touch, MLton_touch) => true
     | (Spork, Spork) => true
     | (Spork_forkThreadAndSetData, Spork_forkThreadAndSetData) => true
-    | (Spork_getData, Spork_getData) => true
+    | (Spork_getData spid, Spork_getData spid') => Spid.equals (spid, spid')
     | (Real_Math_acos s, Real_Math_acos s') => RealSize.equals (s, s')
     | (Real_Math_asin s, Real_Math_asin s') => RealSize.equals (s, s')
     | (Real_Math_atan s, Real_Math_atan s') => RealSize.equals (s, s')
@@ -641,7 +641,7 @@ val map: 'a t * ('a -> 'b) -> 'b t =
     | MLton_touch => MLton_touch
     | Spork => Spork
     | Spork_forkThreadAndSetData => Spork_forkThreadAndSetData
-    | Spork_getData => Spork_getData
+    | Spork_getData spid => Spork_getData spid
     | Real_Math_acos z => Real_Math_acos z
     | Real_Math_asin z => Real_Math_asin z
     | Real_Math_atan z => Real_Math_atan z
@@ -851,7 +851,7 @@ val kind: 'a t -> Kind.t =
        | MLton_touch => SideEffect
        | Spork => SideEffect
        | Spork_forkThreadAndSetData => SideEffect
-       | Spork_getData => DependsOnState
+       | Spork_getData _ => DependsOnState
        | Real_Math_acos _ => DependsOnState (* depends on rounding mode *)
        | Real_Math_asin _ => DependsOnState (* depends on rounding mode *)
        | Real_Math_atan _ => DependsOnState (* depends on rounding mode *)
@@ -1061,7 +1061,7 @@ in
        MLton_touch,
        Spork,
        Spork_forkThreadAndSetData,
-       Spork_getData,
+       (* Spork_getData, *)
        Ref_assign {writeBarrier=true},
        Ref_assign {writeBarrier=false},
        Ref_cas NONE,
@@ -1419,7 +1419,7 @@ fun 'a checkApp (prim: 'a t,
                           (sixArgs (cont, taa, spwn, tba, seq, sync), tc)
                        end)
        | Spork_forkThreadAndSetData => oneTarg (fn t => (twoArgs (thread, t), thread))
-       | Spork_getData => oneTarg (fn t => (noArgs, t))
+       | Spork_getData _ => oneTarg (fn t => (noArgs, t))
        | Real_Math_acos s => realUnary s
        | Real_Math_asin s => realUnary s
        | Real_Math_atan s => realUnary s
@@ -1577,7 +1577,7 @@ fun ('a, 'b) extractTargs (prim: 'b t,
                six (taa, tar, tba, tbr, td, tc)
             end
        | Spork_forkThreadAndSetData => one (arg 1)
-       | Spork_getData => one result
+       | Spork_getData _ => one result
        | Ref_assign _ => one (deRef (arg 0))
        | Ref_cas _ => one (deRef (arg 0))
        | Ref_deref _ => one (deRef (arg 0))

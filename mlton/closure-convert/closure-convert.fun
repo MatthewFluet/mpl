@@ -1115,6 +1115,8 @@ fun closureConvert
                  val seq = arg 4
                  val sync = arg 5
 
+                 val spid = Spid.new ()
+
                  val {contres, data, spwnarg_data, spwnres, seqres, contres_data, syncres} =
                     valOf (! (#sporkInfo info))
 
@@ -1167,7 +1169,7 @@ fun closureConvert
                         Dexp.lett
                         {decs = [{var = data',
                                   exp = Dexp.primApp {args = Vector.new0 (),
-                                                      prim = Prim.Spork_getData,
+                                                      prim = Prim.Spork_getData spid,
                                                       targs = Vector.new1 data_ty,
                                                       ty = data_ty}},
                                  {var = spwnarg_data,
@@ -1194,7 +1196,7 @@ fun closureConvert
                         Dexp.lett
                         {decs = [{var = data',
                                   exp = Dexp.primApp {args = Vector.new0 (),
-                                                      prim = Prim.Spork_getData,
+                                                      prim = Prim.Spork_getData spid,
                                                       targs = Vector.new1 data_ty,
                                                       ty = data_ty}},
                                  {var = contres_data,
@@ -1204,7 +1206,6 @@ fun closureConvert
                          body = sync}
                      end)
 
-                 val spid = Spid.new ()
                  val exp = Dexp.spork
                              {spid = spid,
                               cont = Dexp.lett {decs = [{var = contres,

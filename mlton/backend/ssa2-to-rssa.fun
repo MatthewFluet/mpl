@@ -818,7 +818,7 @@ fun convert (program as S.Program.T {functions, globals, main, ...},
                        case stmt of
                           S.Statement.Bind {var, ty,
                                             exp = S.Exp.PrimApp
-                                                  {prim = Prim.Spork_getData, ...}} =>
+                                                  {prim = Prim.Spork_getData _, ...}} =>
                              let
                                 val l =
                                    case l of
@@ -1752,7 +1752,7 @@ fun convert (program as S.Program.T {functions, globals, main, ...},
                                | Prim.Spork_forkThreadAndSetData =>
                                     simpleCCallWithGCState
                                     (CFunction.sporkForkThreadAndSetData (Operand.ty (a 1)))
-                               | Prim.Spork_getData => none ()
+                               | Prim.Spork_getData _ => none ()
                                | Prim.Thread_atomicBegin =>
                                     (* gcState.atomicState++;
                                      * if (gcState.signalsInfo.signalIsPending)
