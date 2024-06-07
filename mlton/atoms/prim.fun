@@ -1260,6 +1260,9 @@ fun 'a checkApp (prim: 'a t,
       fun fiveTargs f =
          5 = Vector.length targs
          andalso done (f (targ 0, targ 1, targ 2, targ 3, targ 4))
+      fun sixTargs f =
+         6 = Vector.length targs
+         andalso done (f (targ 0, targ 1, targ 2, targ 3, targ 4, targ 5))
       local
          fun make f s = let val t = f s
                         in noTargs (fn () => (oneArg t, t))
@@ -1405,15 +1408,13 @@ fun 'a checkApp (prim: 'a t,
        | MLton_size => oneTarg (fn t => (oneArg t, csize))
        | MLton_touch => oneTarg (fn t => (oneArg t, unit))
        | Spork =>
-            (* spork : ('aa -> 'ar) * 'a * ('ba -> 'br) * 'ba * ('ar -> 'c) * ('ar -> 'c) -> 'c; *)
-            fiveTargs (fn (taa, tar, tba, tbr, tc) =>
+            (* spork : ('aa -> 'ar) * 'aa * ('ba * 'd -> 'br) * 'ba * ('ar -> 'c) * ('ar * 'd -> 'c) -> 'c; *)
+            sixTargs (fn (taa, tar, tba, tbr, td, tc) =>
                        let
                           val cont = arrow (taa, tar)
-                          val spwn = arrow (tba, tbr)
-                          (* val spwn = arrow (tuple (Vector.new2 (tba, td)), tbr) *)
+                          val spwn = arrow (tuple (Vector.new2 (tba, td)), tbr)
                           val seq = arrow (tar, tc)
-                          val sync = arrow (tar, tc)
-                          (* val sync = arrow (tuple (Vector.new2 (tar, td)), tc) *)
+                          val sync = arrow (tuple (Vector.new2 (tar, td)), tc)
                        in
                           (sixArgs (cont, taa, spwn, tba, seq, sync), tc)
                        end)
@@ -1530,10 +1531,10 @@ fun ('a, 'b) extractTargs (prim: 'b t,
                                        deWeak: 'a -> 'a}}) =
    let
       val one = Vector.new1
-      (*val five = Vector.new5*)
       val three = Vector.new3
       val four = Vector.new4
       val five = Vector.new5
+      val six = Vector.new6
       fun arg i = Vector.sub (args, i)
       datatype z = datatype t
    in
@@ -1564,13 +1565,16 @@ fun ('a, 'b) extractTargs (prim: 'b t,
        | MLton_size => one (arg 0)
        | MLton_touch => one (arg 0)
        | Spork =>
-            (* spork : ('aa -> 'ar) * 'aa * ('ba -> 'br) * 'ba * ('ar -> 'c) * ('ar -> 'c) -> 'c; *)
+            (* spork : ('aa -> 'ar) * 'aa * ('ba * 'd -> 'br) * 'ba * ('ar -> 'c) * ('ar * 'd -> 'c) -> 'c; *)
             let
                val (taa, tar) = deArrow (arg 0)
-               val (tba, tbr) = deArrow (arg 2)
-               val (_, tc) = deArrow (arg 4)
+               val (tba_td, tbr) = deArrow (arg 2)
+               val tba_td = deTuple tba_td
+               val tba = Vector.sub (tba_td, 0)
+               val td = Vector.sub (tba_td, 1)
+               val tc = result
             in
-               five (taa, tar, tba, tbr, tc)
+               six (taa, tar, tba, tbr, td, tc)
             end
        | Spork_forkThreadAndSetData => one (arg 1)
        | Spork_getData => one result

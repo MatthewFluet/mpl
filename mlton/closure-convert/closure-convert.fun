@@ -194,6 +194,13 @@ structure VarInfo =
                 isGlobal: bool ref,
                 lambda: Slambda.t option,
                 replacement: Var.t ref,
+                sporkInfo: {contres: Var.t,
+                            data: Var.t,
+                            spwnarg_data: Var.t,
+                            spwnres: Var.t,
+                            seqres: Var.t,
+                            contres_data: Var.t,
+                            syncres: Var.t} option ref,
                 status: Status.t ref,
                 value: Value.t}
 
@@ -264,6 +271,7 @@ fun closureConvert
                                isGlobal = ref false,
                                lambda = lambda,
                                replacement = ref x,
+                               sporkInfo = ref NONE,
                                status = ref Status.init,
                                value = v})
             fun newVar (x, v) = newVar' (x, v, NONE)
@@ -355,14 +363,15 @@ fun closureConvert
                         end
                    | Lambda l => set (loopLambda (l, var))
                    | PrimApp {prim = Prim.Spork, targs, args} =>
-                     (* spork: ('aa -> 'ar) * 'aa * ('ba -> 'br) * 'ba * ('ar -> 'c) * ('ar -> 'c) -> 'c *)
+                     (* spork: ('aa -> 'ar) * 'aa * ('ba * 'd -> 'br) * 'ba * ('ar -> 'c) * ('ar * 'd -> 'c) -> 'c *)
                      let fun targ i = Vector.sub (targs, i)
                          fun arg i = Vector.sub (args, i)
                          val taa = targ 0
                          val tar = targ 1
                          val tba = targ 2
                          val tbr = targ 3
-                         val tc = targ 4
+                         val td = targ 4
+                         val tc = targ 5
                          val cont = arg 0
                          val contarg = arg 1
                          val spwn = arg 2
@@ -371,27 +380,54 @@ fun closureConvert
                          val sync = arg 5
 
                          val contres = Var.newString "contres"
+                         val data = Var.newString "data"
+                         val _ = newVar (data, Value.fromType td)
+                         val spwnarg_data = Var.newString "spwnarg_data"
                          val spwnres = Var.newString "spwnres"
                          val seqres = Var.newString "seqres"
+                         val contres_data = Var.newString "contres_data"
                          val syncres = Var.newString "syncres"
+                          
                          val result = new ()
+
+                         val {sporkInfo, ...} = varInfo var
+                         val _ = sporkInfo := SOME {contres = contres,
+                                                    data = data,
+                                                    spwnarg_data = spwnarg_data,
+                                                    spwnres = spwnres,
+                                                    seqres = seqres,
+                                                    contres_data = contres_data,
+                                                    syncres = syncres}
+
                          val _ = loopBind {var = contres,
                                            ty = tar,
                                            exp = App {func = cont,
                                                       arg = contarg}}
+                         val _ = Value.coerce {from = Value.sporkDataValue td,
+                                               to = value data}
+                         val _ = loopBind {var = spwnarg_data,
+                                           ty = Stype.tuple (Vector.new2 (tba, td)),
+                                           exp = Tuple (Vector.new2
+                                                        (spwnarg,
+                                                         SvarExp.mono data))}
                          val _ = loopBind {var = spwnres,
                                            ty = tbr,
                                            exp = App {func = spwn,
-                                                      arg = spwnarg}}
+                                                      arg = SvarExp.mono spwnarg_data}}
                          val _ = loopBind {var = seqres,
                                            ty = tc,
                                            exp = App {func = seq,
                                                       arg = SvarExp.mono contres}}
+                         val _ = Value.coerce {from = value seqres, to = result}
+                         val _ = loopBind {var = contres_data,
+                                           ty = Stype.tuple (Vector.new2 (tar, td)),
+                                           exp = Tuple (Vector.new2
+                                                        (SvarExp.mono contres,
+                                                         SvarExp.mono data))}
                          val _ = loopBind {var = syncres,
                                            ty = tc,
                                            exp = App {func = sync,
-                                                      arg = SvarExp.mono contres}}
-                         val _ = Value.coerce {from = value seqres, to = result}
+                                                      arg = SvarExp.mono contres_data}}
                          val _ = Value.coerce {from = value syncres, to = result}
                      in
                        ()
@@ -911,7 +947,7 @@ fun closureConvert
                    Sdec.MonoVal {exp, var, ...} =>
                       let
                          val info as {isGlobal, value, ...} = varInfo var
-                         val (exp, ac) = convertPrimExp (exp, value, ac)
+                         val (exp, ac) = convertPrimExp (exp, info, ac)
                          val bind = {var = newVarInfo (var, info),
                                      ty = valueType value,
                                      exp = exp}
@@ -957,8 +993,9 @@ fun closureConvert
                           SprimExp.layout o #1,
                           Layout.ignore,
                           Trace.assertTrue)
-         (fn (e: SprimExp.t, v: Value.t, ac: Accum.t) =>
+         (fn (e: SprimExp.t, info: VarInfo.t, ac: Accum.t) =>
          let
+            val {value = v, ...} = info
             val ty = valueType v
             fun convertJoin (e, ac) =
                let val (e', ac) = convertExp (e, ac)
@@ -1061,7 +1098,7 @@ fun closureConvert
                          ac)
                   end
              | SprimExp.PrimApp {prim = Prim.Spork, targs, args} =>
-              (* spork: ('aa -> 'ar) * 'aa * ('ba -> 'br) * 'bb * ('ar -> 'c) * ('ar -> 'c) -> 'c *)
+              (* spork: ('aa -> 'ar) * 'aa * ('ba * 'd -> 'br) * 'bb * ('ar -> 'c) * ('ar * 'd -> 'c) -> 'c *)
                let
                  fun targ i = Vector.sub (targs, i)
                  fun arg i = Vector.sub (args, i)
@@ -1069,59 +1106,29 @@ fun closureConvert
                  val tar = targ 1
                  val tba = targ 2
                  val tbr = targ 3
-                 val tc = targ 4
+                 val td = targ 4
+                 val tc = targ 5
                  val cont = arg 0
                  val contarg = arg 1
                  val spwn = arg 2
                  val spwnarg = arg 3
                  val seq = arg 4
                  val sync = arg 5
-                 val contres = Var.fromString "contres"
-                 val spwnres = Var.fromString "spwnres"
-                 val seqres = Var.fromString "seqres"
-                 val syncres = Var.fromString "syncres"
-                 (* val datares = Var.newString "datares" *)
-                 val contres_value = Value.fromType tar
-                 val spwnres_value = Value.fromType tbr
-                 (* val datares_value = Value.fromType td *)
-                 (*val _ = setVarInfo
-                           (datares,
-                            {frees = ref (ref []),
-                             isGlobal = ref false,
-                             lambda = NONE,
-                            replacement = ref unitres,
-                            status = ref Status.init,
-                            value = datares_value})*)
-                 val _ = setVarInfo
-                           (contres,
-                            {frees = ref (ref []),
-                             isGlobal = ref false,
-                             lambda = NONE,
-                             replacement = ref contres,
-                             status = ref Status.init,
-                             value = contres_value})
-                 val _ = setVarInfo
-                           (spwnres,
-                            {frees = ref (ref []),
-                             isGlobal = ref false,
-                             lambda = NONE,
-                             replacement = ref spwnres,
-                             status = ref Status.init,
-                             value = spwnres_value})
-                 val _ =
-                     Vector.foreach
-                       (#cons (varExpLambdasInfo cont), fn {lambda, ...} =>
-                        let val {body, ...} = Slambda.dest lambda in
-                          Value.coerce {from = expValue body, to = contres_value}
-                        end)
-                 val _ =
-                     Vector.foreach
-                       (#cons (varExpLambdasInfo spwn), fn {lambda, ...} =>
-                        let val {body, ...} = Slambda.dest lambda in
-                          Value.coerce {from = expValue body, to = spwnres_value}
-                        end)
+
+                 val {contres, data, spwnarg_data, spwnres, seqres, contres_data, syncres} =
+                    valOf (! (#sporkInfo info))
+
+                 val {value = contres_value, ...} = varInfo contres
+                 val {value = data_value, ...} = varInfo data
+                 val {value = spwnarg_data_value, ...} = varInfo spwnarg_data
+                 val {value = spwnres_value, ...} = varInfo spwnres
+                 val {value = contres_data_value, ...} = varInfo contres_data
+
                  val contres_ty = valueType contres_value
+                 val data_ty = valueType data_value
+                 val spwnarg_data_ty = valueType spwnarg_data_value
                  val spwnres_ty = valueType spwnres_value
+                 val contres_data_ty = valueType contres_data_value
 
                  val cont = apply {func = cont,
                                    arg = contarg,
@@ -1137,7 +1144,7 @@ fun closureConvert
                            handler = Dexp.bug "Spork cont raised"}
 
                  val spwn = apply {func = spwn,
-                                   arg = spwnarg,
+                                   arg = SvarExp.mono spwnarg_data,
                                    resultVal = spwnres_value}
                  val spwn =
                     case raiseTy of
@@ -1151,6 +1158,24 @@ fun closureConvert
                  val spwn =
                     Dexp.name (spwn, fn _ =>
                                Dexp.bug "Spork spwn returned")
+                 val spwn =
+                    newScope
+                    (Vector.new1 data, fn xs =>
+                     let
+                        val data' = Vector.first xs
+                     in
+                        Dexp.lett
+                        {decs = [{var = data',
+                                  exp = Dexp.primApp {args = Vector.new0 (),
+                                                      prim = Prim.Spork_getData,
+                                                      targs = Vector.new1 data_ty,
+                                                      ty = data_ty}},
+                                 {var = spwnarg_data,
+                                  exp = Dexp.tuple {exps = Vector.new2 (convertVarExp spwnarg,
+                                                                        convertVar data),
+                                                    ty = spwnarg_data_ty}}],
+                         body = spwn}
+                     end)
 
                  val seq =
                     apply {func = seq,
@@ -1158,8 +1183,26 @@ fun closureConvert
                            resultVal = v}
                  val sync =
                     apply {func = sync,
-                           arg = SvarExp.mono contres,
+                           arg = SvarExp.mono contres_data,
                            resultVal = v}
+                 val sync =
+                    newScope
+                    (Vector.new1 data, fn xs =>
+                     let
+                        val data' = Vector.first xs
+                     in
+                        Dexp.lett
+                        {decs = [{var = data',
+                                  exp = Dexp.primApp {args = Vector.new0 (),
+                                                      prim = Prim.Spork_getData,
+                                                      targs = Vector.new1 data_ty,
+                                                      ty = data_ty}},
+                                 {var = contres_data,
+                                  exp = Dexp.tuple {exps = Vector.new2 (convertVar contres,
+                                                                        convertVar data),
+                                                    ty = contres_data_ty}}],
+                         body = sync}
+                     end)
 
                  val spid = Spid.new ()
                  val exp = Dexp.spork

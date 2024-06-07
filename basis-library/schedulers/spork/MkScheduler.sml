@@ -104,23 +104,15 @@ struct
   
   val primSpork =
       _prim "spork"
-        : ('aa -> 'ar)	(* cont *)
+        : ('aa -> 'ar)      (* cont *)
         * 'aa
-        * ('ba -> 'br)	(* spwn *)
+        * ('ba * 'd -> 'br) (* spwn *)
         * 'ba
-        * ('ar -> 'c)	(* seq  *)
-        * ('ar -> 'c)	(* sync *)
+        * ('ar -> 'c)       (* seq  *)
+        * ('ar * 'd -> 'c)  (* sync *)
         -> 'c;
   val primSpork = fn (cont, spwn, seq, sync) =>
      primSpork (cont, (), spwn, (), seq, sync)
-
-  (*val primFork =
-      _prim "_fork"
-        : (unit -> 'a)
-        * (unit -> 'b)
-        -> 'a*)
-
-  val primGetData = _prim "spork_getData": unit -> 'a;
 
   (* Could add boolean to prim: indicator for
    *   findOldestPromotable     (promote at heartbeats)
@@ -1029,11 +1021,11 @@ struct
         (* TODO: talk with Matthew about the overheads associated with result wrappers *)
         fun cont' () = Result.result cont
 
-        fun spwn' () =
+        fun spwn' ((), jp) =
           let
             val _ = assertAtomic "spork rightside begin" 1
             val J {leftSideThread, rightSideThread, rightSideResult,
-                   tidRight, incounter, spareHeartbeatsGiven, ...} = primGetData ()
+                   tidRight, incounter, spareHeartbeatsGiven, ...} = jp
             val () = DE.decheckSetTid tidRight
 
             val thread = Thread.current ()
@@ -1045,7 +1037,7 @@ struct
             val _ = assertAtomic "spork rightSide before execute" 1
             val _ = Thread.atomicEnd()
 
-            val spwnr = Result.result spwn
+            val spwnr = Result.result (inject o spwn)
 
             val _ = Thread.atomicBegin ()
             val depth' = HH.getDepth (Thread.current ())
@@ -1085,12 +1077,11 @@ struct
         fun seq' contr =
             seq (Result.extractResult contr)
 
-        fun sync' contr =
+        fun sync' (contr, jp) =
           let
             val _ = dbgmsg'' (fn _ => "hello from sync continuation")
             val _ = Thread.atomicBegin ()
             val _ = assertAtomic "sync continuation" 1
-            val jp = primGetData ()
             val spwnr = syncEndAtomic maybeParClearSuspectsAtDepth jp (inject o spwn)
             val contr' = Result.extractResult contr
             val spwnr' = case project (Result.extractResult spwnr) of
