@@ -300,6 +300,7 @@ fun transform (program as Program.T {datatypes, globals, functions, main}) =
                          typeOps = {deArray = Type.deArray,
                                     deArrow = fn _ => Error.bug "SplitTypes.transform.loopExp: deArrow primApp",
                                     deRef = Type.deRef,
+                                    deTuple = Type.deTuple,
                                     deVector = Type.deVector,
                                     deWeak = Type.deWeak}})
                      val newPrim =

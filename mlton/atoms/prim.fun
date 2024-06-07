@@ -1525,6 +1525,7 @@ fun ('a, 'b) extractTargs (prim: 'b t,
                             typeOps = {deArray: 'a -> 'a,
                                        deArrow: 'a -> 'a * 'a,
                                        deRef: 'a -> 'a,
+                                       deTuple: 'a -> 'a vector,
                                        deVector: 'a -> 'a,
                                        deWeak: 'a -> 'a}}) =
    let

@@ -240,6 +240,7 @@ signature PRIM =
                                 typeOps: {deArray: 'b -> 'b,
                                           deArrow: 'b -> 'b * 'b,
                                           deRef: 'b -> 'b,
+                                          deTuple: 'b -> 'b vector,
                                           deVector: 'b -> 'b,
                                           deWeak: 'b -> 'b}} -> 'b vector
       val fromString: string -> 'a t option

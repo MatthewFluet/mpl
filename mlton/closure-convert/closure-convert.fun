@@ -1455,6 +1455,7 @@ fun closureConvert
                                    typeOps = {deArray = Type.deArray,
                                               deArrow = fn _ => Error.bug "ClosureConvert.convertPrimExp: deArrow",
                                               deRef = Type.deRef,
+                                              deTuple = Type.deTuple,
                                               deVector = Type.deVector,
                                               deWeak = Type.deWeak}}),
                                   Vector.map (args, convertVarInfo))

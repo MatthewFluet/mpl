@@ -947,6 +947,7 @@ fun transform (program: Program.t): Program.t =
                                     typeOps = {deArray = Type.deArray,
                                                deArrow = fn _ => Error.bug "Useless.doitExp: deArrow",
                                                deRef = Type.deRef,
+                                               deTuple = Type.deTuple,
                                                deVector = Type.deVector,
                                                deWeak = Type.deWeak}}))}
                      end
