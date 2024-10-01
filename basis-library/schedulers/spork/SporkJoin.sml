@@ -24,13 +24,18 @@ struct
   (*       fn __inline_always__ a => __inline_never__ specializedF a *)
   (*     end *)
 
-  fun __inline_always__ par (f: unit -> 'a, g: unit -> 'b): 'a * 'b =
-      sporkFair {
-        body = fn __inline_always__ () => __inline_always__ f (),
-        spwn = fn __inline_always__ () => __inline_always__ g (),
-        seq  = fn __inline_always__ a => (a, __inline_always__ g ()),
-        sync = fn __inline_always__ ab => ab
+  fun __inline_always__ parXtra (f: 'aa -> 'ar, x: 'aa, g: 'ba -> 'br, y: 'ba): 'ar * 'br =
+      Scheduler.SporkJoin.sporkXtraFair {
+        body = f,
+        body_arg = x,
+        spwn = g,
+        spwn_arg = y,
+        seq  = fn __inline_always__ fr => (fr, __inline_always__ g y),
+        sync = fn __inline_always__ fr_gr => fr_gr
       }
+
+  fun __inline_always__ par (f: unit -> 'a, g: unit -> 'b): 'a * 'b =
+      parXtra (f, (), g, ())
 
   val fork = par
 

@@ -3,6 +3,7 @@ sig
   (* synonym for par *)
   val fork: (unit -> 'a) * (unit -> 'b) -> 'a * 'b 
   val par: (unit -> 'a) * (unit -> 'b) -> 'a * 'b
+  val parXtra: ('aa -> 'ar) * 'aa * ('ba -> 'br) * 'ba -> 'ar * 'br
   val sporkFair: {body: unit -> 'a, spwn: unit -> 'b, seq: 'a -> 'c, sync: 'a * 'b -> 'c} -> 'c
   val sporkKeep: {body: unit -> 'a, spwn: unit -> 'b, seq: 'a -> 'c, sync: 'a * 'b -> 'c} -> 'c
   val sporkGive: {body: unit -> 'a, spwn: unit -> 'b, seq: 'a -> 'c, sync: 'a * 'b -> 'c} -> 'c
